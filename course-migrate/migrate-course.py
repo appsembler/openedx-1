@@ -332,6 +332,11 @@ if fix == True:
         problemFiles = glob.glob(sourceDir + "migrated/"+fname+"/course/problem/*.xml")
         for fp in problemFiles:
            fixProblemSolutionSection(fp)
+        # Also fix the problems in drafts folder that unpublished ones.
+	problemFiles = glob.glob(sourceDir + "migrated/"+fname+"/course/drafts/problem/*.xml")
+        for fp in problemFiles:
+           fixProblemSolutionSection(fp)
+
 
 # Create the new tar.gaz files in output/ folder with compatibility issues fixed.  
 os.system('chmod  777 -R ' + sourceDir+'migrated/' )
