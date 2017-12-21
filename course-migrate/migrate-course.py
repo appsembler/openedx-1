@@ -172,6 +172,8 @@ def getXBlockList():
 xm_list = getXModuleList()
 xb_list = getXBlockList()
 
+script_dir = os.path.realpath(os.path.dirname(__file__))
+
 sourceDir,showInfo,fromVer,toVer,importAuto,installMissingXblocks,deleteTabs,fix,videoUploadPipeline = main(sys.argv[1:])
 
 files = glob.glob(sourceDir + "*.tar.gz")
@@ -350,14 +352,43 @@ print 'Created output tar.gaz files under ' +sourceDir+'output/'
 os.system('chmod  777 -R ' + sourceDir+'output/*')
 
 
+def execfile_in_edxapp_env(filepath, exports):
+    shell = 'sudo -u edxapp /edx/bin/python.edxapp /edx/bin/manage.edxapp lms --settings={env} shell'.format(
+        env='devstack_appsembler' if os.path.exists('/edx/src') else 'aws_appsembler',
+    )
+
+    os.system('echo "{exports}; execfile(\'{filepath}\')" | {shell}'.format(
+        filepath=filepath,
+        exports='; '.join(['{key}=\'{val}\''.format(key=key, val=val) for key, val in exports.iteritems()]),
+        shell=shell,
+    ))
+
+
+def getNormalizedCourseID(course_file):
+    from datetime import datetime
+
+    with open(course_file) as course_file_obj:
+        soup = bs.BeautifulSoup(course_file_obj, 'xml')
+
+        return 'course-v1:Microsoft+{course}+{year}'.format(
+            course=soup.course['course'],
+            year=datetime.now().year,
+        )
+
 # Automatically import courses
 if importAuto == True:
-    os.chdir('/edx/app/edxapp/edx-platform') 
-    print "Automatically importing compatibility-issues-fixed courses from " + sourceDir+"migrated/"  
+    os.chdir('/edx/app/edxapp/edx-platform')
+    print "Automatically importing compatibility-issues-fixed courses from " + sourceDir+"migrated/"
     for f in files:
         fname = f[sourceDirLen:] # Remove the path from full file name. Now have only file name
         print " ==> Importing course from " + fname
-        os.system('sudo -u www-data /edx/bin/python.edxapp ./manage.py cms --settings=aws import /edx/var/edxapp/data ' + sourceDir+'migrated/'+fname+'/course')
+        # os.system('sudo -u www-data /edx/bin/python.edxapp ./manage.py cms --settings=aws import /edx/var/edxapp/data ' + sourceDir+'migrated/'+fname+'/course')
+
+        execfile_in_edxapp_env(os.path.join(script_dir, 'import-course.py'), exports={
+            'course_id': getNormalizedCourseID(sourceDir+'migrated/'+fname+'/course/course.xml'),
+            'course_dir': sourceDir+'migrated/'+fname+'/course',
+        })
+
 
 print "Successfully completed migration"
 
